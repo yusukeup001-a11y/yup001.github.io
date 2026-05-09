@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fibonacci Camera - Final Edition</title>
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; position: relative; }
+        /* 背面のカメラ映像 */
+        #video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            object-fit: cover;
+            z-index: 1;
+        }
+        /* 前面の螺旋ガイド */
+        #spiralCanvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 2;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<video id="video" autoplay playsinline muted></video>
+<canvas id="spiralCanvas"></canvas>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('spiralCanvas');
+    const ctx = canvas.getContext('2d');
+    const PHI = (1 + Math.sqrt(5)) / 2;
+
+    // カメラの初期化
+    async function initCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' },
+                audio: false
+            });
+            video.srcObject = stream;
+        } catch (err) {
+            console.error("Camera access denied:", err);
+            alert("カメラへのアクセスを許可してください。");
+        }
+    }
+
+    // 添付いただいたリファクタ済みロジックに基づく描画
+    function draw() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 黄金長方形のベースサイズ計算
+        let rectW, rectH;
+        if (canvas.width / canvas.height > PHI) {
+            rectH = canvas.height * 0.8;
+            rectW = rectH * PHI;
+        } else {
+            rectW = canvas.width * 0.8;
+            rectH = rectW / PHI;
+        }
+
+        let x = (canvas.width - rectW) / 2;
+        let y = (canvas.height - rectH) / 2;
+        let w = rectW;
+        let h = rectH;
+
+        const iterations = 10;
+
+        for (let i = 0; i < iterations; i++) {
+            const side = (i % 2 === 0) ? h : w;
+            const dir = i % 4;
+
+            let cx, cy, startAngle, endAngle;
+            let squareX = x;
+            let squareY = y;
+
+            switch (dir) {
+                case 0:
+                    cx = x + side; cy = y + side;
+                    startAngle = Math.PI; endAngle = 1.5 * Math.PI;
+                    squareX = x; squareY = y;
+                    x += side; w -= side;
+                    break;
+                case 1:
+                    cx = x; cy = y + side;
+                    startAngle = 1.5 * Math.PI; endAngle = 2 * Math.PI;
+                    squareX = x; squareY = y;
+                    y += side; h -= side;
+                    break;
+                case 2:
+                    cx = x + w - side; cy = y;
+                    startAngle = 0; endAngle = 0.5 * Math.PI;
+                    squareX = x + w - side; squareY = y;
+                    w -= side;
+                    break;
+                case 3:
+                    cx = x + side; cy = y + h - side;
+                    startAngle = 0.5 * Math.PI; endAngle = Math.PI;
+                    squareX = x; squareY = y + h - side;
+                    h -= side;
+                    break;
+            }
+
+            // ガイド線のスタイル設定
+            ctx.strokeStyle = 'rgba(100, 255, 255, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(squareX, squareY, side, side);
+
+            // 螺旋のスタイル設定
+            ctx.beginPath();
+            ctx.strokeStyle = '#00bbff';
+            ctx.lineWidth = 2.5;
+            ctx.arc(cx, cy, side, startAngle, endAngle, false);
+            ctx.stroke();
+
+            if (side < 2) break;
+        }
+
+        // 外枠の描画
+        ctx.strokeStyle = 'rgba(100, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect((canvas.width - rectW) / 2, (canvas.height - rectH) / 2, rectW, rectH);
+    }
+
+    window.addEventListener('resize', draw);
+    window.onload = () => {
+        initCamera();
+        draw();
+    };
+</script>
+
+</body>
+</html>
