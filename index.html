@@ -1,13 +1,13 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fibonacci Camera - Ultimate</title>
+    <title>Fibonacci Camera - Pro Edition</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: sans-serif; }
         
-        /* ビデオの配置 */
         #videoContainer {
             position: absolute;
             top: 0; left: 0;
@@ -18,7 +18,6 @@
             width: 100%; height: 100%;
             object-fit: cover;
         }
-        /* 前面カメラ時にミラー反転させるクラス */
         .mirror { transform: scaleX(-1); }
 
         #spiralCanvas {
@@ -29,38 +28,47 @@
             pointer-events: none;
         }
 
-        /* 画面上部のコントロール */
         .top-controls {
             position: absolute;
             top: 20px; width: 100%;
             display: flex; justify-content: space-between;
-            padding: 0 20px; box-sizing: border-box;
+            padding: 0 15px; box-sizing: border-box;
             z-index: 10;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .btn-ui {
             background: rgba(0, 0, 0, 0.5);
             color: white; border: 1px solid rgba(255,255,255,0.5);
-            padding: 10px 15px; border-radius: 8px; font-size: 14px;
+            padding: 8px 12px; border-radius: 8px; font-size: 13px;
+            cursor: pointer;
         }
 
-        /* 画面下部のコントロール */
         .bottom-controls {
             position: absolute;
             bottom: 30px; left: 50%;
             transform: translateX(-50%);
-            z-index: 10; width: 80%;
-            display: flex; flex-direction: column; align-items: center; gap: 20px;
+            z-index: 10; width: 85%;
+            display: flex; flex-direction: column; align-items: center; gap: 15px;
         }
 
-        .slider-container {
-            width: 100%; background: rgba(0, 0, 0, 0.5);
-            padding: 10px 20px; border-radius: 20px;
-            display: flex; align-items: center; gap: 10px; color: white;
+        .slider-group {
+            width: 100%; background: rgba(0, 0, 0, 0.6);
+            padding: 15px; border-radius: 15px;
+            display: flex; flex-direction: column; gap: 10px; color: white;
         }
+
+        .slider-row {
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .slider-label { font-size: 11px; width: 30px; text-align: center; }
+
+        input[type=range] { flex-grow: 1; }
 
         #captureBtn {
-            width: 75px; height: 75px; background: white;
+            width: 70px; height: 70px; background: white;
             border: 5px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%; cursor: pointer;
         }
@@ -75,14 +83,22 @@
 
 <div class="top-controls">
     <button id="flipBtn" class="btn-ui">カメラ切替</button>
-    <label class="btn-ui"><input type="checkbox" id="includeSpiral" checked> ガイドも保存</label>
+    <button id="resetBtn" class="btn-ui">リセット</button>
+    <label class="btn-ui"><input type="checkbox" id="includeSpiral" checked> ガイド保存</label>
 </div>
 
 <div class="bottom-controls">
-    <div class="slider-container">
-        <span style="font-size:12px">縮小</span>
-        <input type="range" id="scaleSlider" min="0.1" max="2.0" step="0.01" value="0.8" style="flex-grow:1">
-        <span style="font-size:12px">拡大</span>
+    <div class="slider-group">
+        <div class="slider-row">
+            <span class="slider-label">縮小</span>
+            <input type="range" id="scaleSlider" min="0.1" max="2.0" step="0.01" value="0.8">
+            <span class="slider-label">拡大</span>
+        </div>
+        <div class="slider-row">
+            <span class="slider-label">回転</span>
+            <input type="range" id="rotateSlider" min="0" max="360" step="1" value="0">
+            <span class="slider-label">360°</span>
+        </div>
     </div>
     <button id="captureBtn"></button>
 </div>
@@ -92,24 +108,26 @@
     const canvas = document.getElementById('spiralCanvas');
     const ctx = canvas.getContext('2d');
     const scaleSlider = document.getElementById('scaleSlider');
+    const rotateSlider = document.getElementById('rotateSlider');
     const captureBtn = document.getElementById('captureBtn');
     const flipBtn = document.getElementById('flipBtn');
+    const resetBtn = document.getElementById('resetBtn');
     const includeSpiralCheck = document.getElementById('includeSpiral');
     
     const PHI = (1 + Math.sqrt(5)) / 2;
-    let currentScale = 0.8;
+    const INITIAL_SCALE = 0.8;
+    const INITIAL_ROTATE = 0;
+
+    let currentScale = INITIAL_SCALE;
+    let currentRotation = INITIAL_ROTATE;
     let useFrontCamera = false;
 
-    // カメラの起動・再起動
     async function initCamera() {
         if (video.srcObject) {
             video.srcObject.getTracks().forEach(track => track.stop());
         }
-
         const mode = useFrontCamera ? "user" : "environment";
-        // 前面カメラならミラー反転クラスを適用
         video.classList.toggle('mirror', useFrontCamera);
-
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: mode },
@@ -117,15 +135,20 @@
             });
             video.srcObject = stream;
         } catch (err) {
-            alert("カメラの切り替えに失敗しました。");
+            alert("カメラの起動に失敗しました。");
         }
     }
 
-    // 添付のリファクタ済みロジック
     function draw() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        // 画面中央を基準に回転を適用
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(currentRotation * Math.PI / 180);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
         let rectW, rectH;
         if (canvas.width / canvas.height > PHI) {
@@ -164,11 +187,23 @@
             ctx.stroke();
             if (side < 2) break;
         }
+        
+        ctx.strokeStyle = 'rgba(100, 255, 255, 0.4)';
+        ctx.strokeRect((canvas.width - rectW) / 2, (canvas.height - rectH) / 2, rectW, rectH);
+        ctx.restore();
     }
 
-    // イベント設定
     scaleSlider.addEventListener('input', (e) => { currentScale = parseFloat(e.target.value); draw(); });
+    rotateSlider.addEventListener('input', (e) => { currentRotation = parseInt(e.target.value); draw(); });
     
+    resetBtn.addEventListener('click', () => {
+        currentScale = INITIAL_SCALE;
+        currentRotation = INITIAL_ROTATE;
+        scaleSlider.value = INITIAL_SCALE;
+        rotateSlider.value = INITIAL_ROTATE;
+        draw();
+    });
+
     flipBtn.addEventListener('click', () => {
         useFrontCamera = !useFrontCamera;
         initCamera();
@@ -180,21 +215,20 @@
         saveCanvas.height = video.videoHeight;
         const saveCtx = saveCanvas.getContext('2d');
 
-        // 前面カメラなら保存時も反転させる
         if (useFrontCamera) {
             saveCtx.translate(saveCanvas.width, 0);
             saveCtx.scale(-1, 1);
         }
-
         saveCtx.drawImage(video, 0, 0, saveCanvas.width, saveCanvas.height);
 
         if (includeSpiralCheck.checked) {
-            saveCtx.setTransform(1, 0, 0, 1, 0, 0); // 反転リセット
+            saveCtx.setTransform(1, 0, 0, 1, 0, 0);
+            // 保存時も回転・スケールを考慮して重ねる
             saveCtx.drawImage(canvas, 0, 0, saveCanvas.width, saveCanvas.height);
         }
 
         const link = document.createElement('a');
-        link.download = `fibonacci_capture.png`;
+        link.download = `fibonacci_capture_${Date.now()}.png`;
         link.href = saveCanvas.toDataURL('image/png');
         link.click();
     });
