@@ -3,18 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fibonacci Camera - Final Edition</title>
+    <title>Fibonacci Camera - Ultimate</title>
     <style>
-        body { margin: 0; background-color: #000; overflow: hidden; position: relative; }
-        /* 背面のカメラ映像 */
-        #video {
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: sans-serif; }
+        
+        /* ビデオの配置 */
+        #videoContainer {
             position: absolute;
             top: 0; left: 0;
             width: 100vw; height: 100vh;
-            object-fit: cover;
             z-index: 1;
         }
-        /* 前面の螺旋ガイド */
+        #video {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        /* 前面カメラ時にミラー反転させるクラス */
+        .mirror { transform: scaleX(-1); }
+
         #spiralCanvas {
             position: absolute;
             top: 0; left: 0;
@@ -22,46 +28,111 @@
             z-index: 2;
             pointer-events: none;
         }
+
+        /* 画面上部のコントロール */
+        .top-controls {
+            position: absolute;
+            top: 20px; width: 100%;
+            display: flex; justify-content: space-between;
+            padding: 0 20px; box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .btn-ui {
+            background: rgba(0, 0, 0, 0.5);
+            color: white; border: 1px solid rgba(255,255,255,0.5);
+            padding: 10px 15px; border-radius: 8px; font-size: 14px;
+        }
+
+        /* 画面下部のコントロール */
+        .bottom-controls {
+            position: absolute;
+            bottom: 30px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 10; width: 80%;
+            display: flex; flex-direction: column; align-items: center; gap: 20px;
+        }
+
+        .slider-container {
+            width: 100%; background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px; border-radius: 20px;
+            display: flex; align-items: center; gap: 10px; color: white;
+        }
+
+        #captureBtn {
+            width: 75px; height: 75px; background: white;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%; cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
-<video id="video" autoplay playsinline muted></video>
+<div id="videoContainer">
+    <video id="video" autoplay playsinline muted></video>
+</div>
 <canvas id="spiralCanvas"></canvas>
+
+<div class="top-controls">
+    <button id="flipBtn" class="btn-ui">カメラ切替</button>
+    <label class="btn-ui"><input type="checkbox" id="includeSpiral" checked> ガイドも保存</label>
+</div>
+
+<div class="bottom-controls">
+    <div class="slider-container">
+        <span style="font-size:12px">縮小</span>
+        <input type="range" id="scaleSlider" min="0.1" max="2.0" step="0.01" value="0.8" style="flex-grow:1">
+        <span style="font-size:12px">拡大</span>
+    </div>
+    <button id="captureBtn"></button>
+</div>
 
 <script>
     const video = document.getElementById('video');
     const canvas = document.getElementById('spiralCanvas');
     const ctx = canvas.getContext('2d');
+    const scaleSlider = document.getElementById('scaleSlider');
+    const captureBtn = document.getElementById('captureBtn');
+    const flipBtn = document.getElementById('flipBtn');
+    const includeSpiralCheck = document.getElementById('includeSpiral');
+    
     const PHI = (1 + Math.sqrt(5)) / 2;
+    let currentScale = 0.8;
+    let useFrontCamera = false;
 
-    // カメラの初期化
+    // カメラの起動・再起動
     async function initCamera() {
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+        }
+
+        const mode = useFrontCamera ? "user" : "environment";
+        // 前面カメラならミラー反転クラスを適用
+        video.classList.toggle('mirror', useFrontCamera);
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' },
+                video: { facingMode: mode },
                 audio: false
             });
             video.srcObject = stream;
         } catch (err) {
-            console.error("Camera access denied:", err);
-            alert("カメラへのアクセスを許可してください。");
+            alert("カメラの切り替えに失敗しました。");
         }
     }
 
-    // 添付いただいたリファクタ済みロジックに基づく描画
+    // 添付のリファクタ済みロジック
     function draw() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 黄金長方形のベースサイズ計算
         let rectW, rectH;
         if (canvas.width / canvas.height > PHI) {
-            rectH = canvas.height * 0.8;
+            rectH = canvas.height * currentScale;
             rectW = rectH * PHI;
         } else {
-            rectW = canvas.width * 0.8;
+            rectW = canvas.width * currentScale;
             rectH = rectW / PHI;
         }
 
@@ -70,70 +141,66 @@
         let w = rectW;
         let h = rectH;
 
-        const iterations = 10;
-
-        for (let i = 0; i < iterations; i++) {
+        for (let i = 0; i < 10; i++) {
             const side = (i % 2 === 0) ? h : w;
             const dir = i % 4;
-
-            let cx, cy, startAngle, endAngle;
-            let squareX = x;
-            let squareY = y;
+            let cx, cy, startAngle, endAngle, sqX = x, sqY = y;
 
             switch (dir) {
-                case 0:
-                    cx = x + side; cy = y + side;
-                    startAngle = Math.PI; endAngle = 1.5 * Math.PI;
-                    squareX = x; squareY = y;
-                    x += side; w -= side;
-                    break;
-                case 1:
-                    cx = x; cy = y + side;
-                    startAngle = 1.5 * Math.PI; endAngle = 2 * Math.PI;
-                    squareX = x; squareY = y;
-                    y += side; h -= side;
-                    break;
-                case 2:
-                    cx = x + w - side; cy = y;
-                    startAngle = 0; endAngle = 0.5 * Math.PI;
-                    squareX = x + w - side; squareY = y;
-                    w -= side;
-                    break;
-                case 3:
-                    cx = x + side; cy = y + h - side;
-                    startAngle = 0.5 * Math.PI; endAngle = Math.PI;
-                    squareX = x; squareY = y + h - side;
-                    h -= side;
-                    break;
+                case 0: cx = x + side; cy = y + side; startAngle = Math.PI; endAngle = 1.5 * Math.PI; x += side; w -= side; break;
+                case 1: cx = x; cy = y + side; startAngle = 1.5 * Math.PI; endAngle = 2 * Math.PI; y += side; h -= side; break;
+                case 2: cx = x + w - side; cy = y; startAngle = 0; endAngle = 0.5 * Math.PI; sqX = x + w - side; w -= side; break;
+                case 3: cx = x + side; cy = y + h - side; startAngle = 0.5 * Math.PI; endAngle = Math.PI; sqY = y + h - side; h -= side; break;
             }
 
-            // ガイド線のスタイル設定
             ctx.strokeStyle = 'rgba(100, 255, 255, 0.4)';
             ctx.lineWidth = 1;
-            ctx.strokeRect(squareX, squareY, side, side);
+            ctx.strokeRect(sqX, sqY, side, side);
 
-            // 螺旋のスタイル設定
             ctx.beginPath();
             ctx.strokeStyle = '#00bbff';
             ctx.lineWidth = 2.5;
             ctx.arc(cx, cy, side, startAngle, endAngle, false);
             ctx.stroke();
-
             if (side < 2) break;
         }
-
-        // 外枠の描画
-        ctx.strokeStyle = 'rgba(100, 255, 255, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect((canvas.width - rectW) / 2, (canvas.height - rectH) / 2, rectW, rectH);
     }
 
-    window.addEventListener('resize', draw);
-    window.onload = () => {
+    // イベント設定
+    scaleSlider.addEventListener('input', (e) => { currentScale = parseFloat(e.target.value); draw(); });
+    
+    flipBtn.addEventListener('click', () => {
+        useFrontCamera = !useFrontCamera;
         initCamera();
-        draw();
-    };
-</script>
+    });
 
+    captureBtn.addEventListener('click', () => {
+        const saveCanvas = document.createElement('canvas');
+        saveCanvas.width = video.videoWidth;
+        saveCanvas.height = video.videoHeight;
+        const saveCtx = saveCanvas.getContext('2d');
+
+        // 前面カメラなら保存時も反転させる
+        if (useFrontCamera) {
+            saveCtx.translate(saveCanvas.width, 0);
+            saveCtx.scale(-1, 1);
+        }
+
+        saveCtx.drawImage(video, 0, 0, saveCanvas.width, saveCanvas.height);
+
+        if (includeSpiralCheck.checked) {
+            saveCtx.setTransform(1, 0, 0, 1, 0, 0); // 反転リセット
+            saveCtx.drawImage(canvas, 0, 0, saveCanvas.width, saveCanvas.height);
+        }
+
+        const link = document.createElement('a');
+        link.download = `fibonacci_capture.png`;
+        link.href = saveCanvas.toDataURL('image/png');
+        link.click();
+    });
+
+    window.addEventListener('resize', draw);
+    window.onload = () => { initCamera(); draw(); };
+</script>
 </body>
 </html>
