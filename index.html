@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fibonacci Camera - Pro Edition</title>
+    <title>Composition Camera - 3 Modes Edition</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: sans-serif; }
         
@@ -43,6 +42,18 @@
             color: white; border: 1px solid rgba(255,255,255,0.5);
             padding: 8px 12px; border-radius: 8px; font-size: 13px;
             cursor: pointer;
+            outline: none;
+        }
+        
+        select.btn-ui {
+            padding-right: 25px;
+            background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23fff' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 8px 10px;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
         }
 
         .bottom-controls {
@@ -83,6 +94,13 @@
 
 <div class="top-controls">
     <button id="flipBtn" class="btn-ui">カメラ切替</button>
+    
+    <select id="ratioSelect" class="btn-ui">
+        <option value="golden-spiral">黄金スパイラル（渦巻き）</option>
+        <option value="golden-rect">黄金長方形 (1:1.618)</option>
+        <option value="silver-rect">白銀長方形 (1:1.414)</option>
+    </select>
+    
     <button id="resetBtn" class="btn-ui">リセット</button>
     <label class="btn-ui"><input type="checkbox" id="includeSpiral" checked> ガイド保存</label>
 </div>
@@ -112,9 +130,12 @@
     const captureBtn = document.getElementById('captureBtn');
     const flipBtn = document.getElementById('flipBtn');
     const resetBtn = document.getElementById('resetBtn');
+    const ratioSelect = document.getElementById('ratioSelect');
     const includeSpiralCheck = document.getElementById('includeSpiral');
     
-    const PHI = (1 + Math.sqrt(5)) / 2;
+    const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
+    const SILVER_RATIO = Math.sqrt(2);
+    
     const INITIAL_SCALE = 0.8;
     const INITIAL_ROTATE = 0;
 
@@ -145,56 +166,95 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         ctx.save();
-        // 画面中央を基準に回転を適用
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.rotate(currentRotation * Math.PI / 180);
         ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
+        const currentMode = ratioSelect.value;
+        const isSilver = currentMode === 'silver-rect';
+        
+        // 比率と描画色の振り分け
+        const ratio = isSilver ? SILVER_RATIO : GOLDEN_RATIO;
+        const color = isSilver ? '#cccccc' : '#00bbff'; // 白銀はシルバー、黄金系は青
+
+        // 全体の長方形のサイズを計算
         let rectW, rectH;
-        if (canvas.width / canvas.height > PHI) {
+        if (canvas.width / canvas.height > ratio) {
             rectH = canvas.height * currentScale;
-            rectW = rectH * PHI;
+            rectW = rectH * ratio;
         } else {
             rectW = canvas.width * currentScale;
-            rectH = rectW / PHI;
+            rectH = rectW / ratio;
         }
 
-        let x = (canvas.width - rectW) / 2;
-        let y = (canvas.height - rectH) / 2;
-        let w = rectW;
-        let h = rectH;
+        const rx = (canvas.width - rectW) / 2;
+        const ry = (canvas.height - rectH) / 2;
 
-        for (let i = 0; i < 10; i++) {
-            const side = (i % 2 === 0) ? h : w;
-            const dir = i % 4;
-            let cx, cy, startAngle, endAngle, sqX = x, sqY = y;
+        // 【黄金スパイラルモード】の時のみ内側の分割線と渦巻きをループ描画
+        if (currentMode === 'golden-spiral') {
+            let x = rx;
+            let y = ry;
+            let w = rectW;
+            let h = rectH;
 
-            switch (dir) {
-                case 0: cx = x + side; cy = y + side; startAngle = Math.PI; endAngle = 1.5 * Math.PI; x += side; w -= side; break;
-                case 1: cx = x; cy = y + side; startAngle = 1.5 * Math.PI; endAngle = 2 * Math.PI; y += side; h -= side; break;
-                case 2: cx = x + w - side; cy = y; startAngle = 0; endAngle = 0.5 * Math.PI; sqX = x + w - side; w -= side; break;
-                case 3: cx = x + side; cy = y + h - side; startAngle = 0.5 * Math.PI; endAngle = Math.PI; sqY = y + h - side; h -= side; break;
+            for (let i = 0; i < 10; i++) {
+                const side = (i % 2 === 0) ? h : w;
+                const dir = i % 4;
+                let cx, cy, startAngle, endAngle, squareX = x, squareY = y;
+
+                switch (dir) {
+                    case 0:
+                        cx = x + side; cy = y + side;
+                        startAngle = Math.PI; endAngle = 1.5 * Math.PI;
+                        x += side; w -= side;
+                        break;
+                    case 1:
+                        cx = x; cy = y + side;
+                        startAngle = 1.5 * Math.PI; endAngle = 2 * Math.PI;
+                        y += side; h -= side;
+                        break;
+                    case 2:
+                        cx = x + w - side; cy = y;
+                        startAngle = 0; endAngle = 0.5 * Math.PI;
+                        squareX = x + w - side;
+                        w -= side;
+                        break;
+                    case 3:
+                        cx = x + side; cy = y + h - side;
+                        startAngle = 0.5 * Math.PI; endAngle = Math.PI;
+                        squareY = y + h - side;
+                        h -= side;
+                        break;
+                }
+
+                // 正方形のガイド線
+                ctx.strokeStyle = 'rgba(100, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(squareX, squareY, side, side);
+
+                // スパイラル（弧）
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2.5;
+                ctx.arc(cx, cy, side, startAngle, endAngle, false);
+                ctx.stroke();
+
+                if (side < 2) break;
             }
-
-            ctx.strokeStyle = 'rgba(100, 255, 255, 0.4)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(sqX, sqY, side, side);
-
-            ctx.beginPath();
-            ctx.strokeStyle = '#00bbff';
-            ctx.lineWidth = 2.5;
-            ctx.arc(cx, cy, side, startAngle, endAngle, false);
-            ctx.stroke();
-            if (side < 2) break;
         }
-        
-        ctx.strokeStyle = 'rgba(100, 255, 255, 0.4)';
-        ctx.strokeRect((canvas.width - rectW) / 2, (canvas.height - rectH) / 2, rectW, rectH);
+
+        // 【共通の外枠長方形】すべてのモードで外枠フレームを描画
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(rx, ry, rectW, rectH);
+
         ctx.restore();
     }
 
+    // イベント設定
     scaleSlider.addEventListener('input', (e) => { currentScale = parseFloat(e.target.value); draw(); });
     rotateSlider.addEventListener('input', (e) => { currentRotation = parseInt(e.target.value); draw(); });
+    ratioSelect.addEventListener('change', draw);
     
     resetBtn.addEventListener('click', () => {
         currentScale = INITIAL_SCALE;
@@ -223,12 +283,11 @@
 
         if (includeSpiralCheck.checked) {
             saveCtx.setTransform(1, 0, 0, 1, 0, 0);
-            // 保存時も回転・スケールを考慮して重ねる
             saveCtx.drawImage(canvas, 0, 0, saveCanvas.width, saveCanvas.height);
         }
 
         const link = document.createElement('a');
-        link.download = `fibonacci_capture_${Date.now()}.png`;
+        link.download = `${ratioSelect.value}_capture_${Date.now()}.png`;
         link.href = saveCanvas.toDataURL('image/png');
         link.click();
     });
