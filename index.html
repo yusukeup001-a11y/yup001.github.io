@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Composition Camera - 3 Modes Edition</title>
+    <title>Composition Camera - Unified Color Edition</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: sans-serif; }
         
@@ -68,15 +68,29 @@
             width: 100%; background: rgba(0, 0, 0, 0.6);
             padding: 15px; border-radius: 15px;
             display: flex; flex-direction: column; gap: 10px; color: white;
+            box-sizing: border-box;
         }
 
         .slider-row {
             display: flex; align-items: center; gap: 10px;
         }
 
-        .slider-label { font-size: 11px; width: 30px; text-align: center; }
+        .slider-label { font-size: 11px; width: 35px; text-align: center; }
 
         input[type=range] { flex-grow: 1; }
+
+        /* ★ カラーピッカーエリアを共通1つにすっきり統合 */
+        .color-picker-group {
+            display: flex; justify-content: center; align-items: center; gap: 15px; width: 100%;
+            border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px; margin-top: 5px;
+        }
+        .color-item {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .color-label { font-size: 11px; color: #ccc; }
+        input[type=color] {
+            border: none; background: none; width: 45px; height: 30px; cursor: pointer; padding: 0;
+        }
 
         #captureBtn {
             width: 70px; height: 70px; background: white;
@@ -117,6 +131,13 @@
             <input type="range" id="rotateSlider" min="0" max="360" step="1" value="0">
             <span class="slider-label">360°</span>
         </div>
+
+        <div class="color-picker-group">
+            <div class="color-item">
+                <span class="color-label">ガイドの色設定</span>
+                <input type="color" id="globalColor" value="#00bbff">
+            </div>
+        </div>
     </div>
     <button id="captureBtn"></button>
 </div>
@@ -133,11 +154,15 @@
     const ratioSelect = document.getElementById('ratioSelect');
     const includeSpiralCheck = document.getElementById('includeSpiral');
     
+    // ★ 共通カラーピッカーの要素を取得
+    const globalColorInput = document.getElementById('globalColor');
+    
     const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
     const SILVER_RATIO = Math.sqrt(2);
     
     const INITIAL_SCALE = 0.8;
     const INITIAL_ROTATE = 0;
+    const INITIAL_COLOR = '#00bbff'; // 初期カラー値（青）
 
     let currentScale = INITIAL_SCALE;
     let currentRotation = INITIAL_ROTATE;
@@ -172,12 +197,11 @@
 
         const currentMode = ratioSelect.value;
         const isSilver = currentMode === 'silver-rect';
-        
-        // 比率と描画色の振り分け
         const ratio = isSilver ? SILVER_RATIO : GOLDEN_RATIO;
-        const color = isSilver ? '#cccccc' : '#00bbff'; // 白銀はシルバー、黄金系は青
+        
+        // ★ モードに関係なく、共通のカラーピッカーから色を取得
+        const color = globalColorInput.value;
 
-        // 全体の長方形のサイズを計算
         let rectW, rectH;
         if (canvas.width / canvas.height > ratio) {
             rectH = canvas.height * currentScale;
@@ -190,7 +214,6 @@
         const rx = (canvas.width - rectW) / 2;
         const ry = (canvas.height - rectH) / 2;
 
-        // 【黄金スパイラルモード】の時のみ内側の分割線と渦巻きをループ描画
         if (currentMode === 'golden-spiral') {
             let x = rx;
             let y = ry;
@@ -227,14 +250,12 @@
                         break;
                 }
 
-                // 正方形のガイド線
                 ctx.strokeStyle = 'rgba(100, 255, 255, 0.2)';
                 ctx.lineWidth = 1;
                 ctx.strokeRect(squareX, squareY, side, side);
 
-                // スパイラル（弧）
                 ctx.beginPath();
-                ctx.strokeStyle = color;
+                ctx.strokeStyle = color; // 共通色をスパイラルに適用
                 ctx.lineWidth = 2.5;
                 ctx.arc(cx, cy, side, startAngle, endAngle, false);
                 ctx.stroke();
@@ -243,8 +264,7 @@
             }
         }
 
-        // 【共通の外枠長方形】すべてのモードで外枠フレームを描画
-        ctx.strokeStyle = color;
+        ctx.strokeStyle = color; // 共通色を外枠に適用
         ctx.lineWidth = 2.5;
         ctx.strokeRect(rx, ry, rectW, rectH);
 
@@ -256,11 +276,18 @@
     rotateSlider.addEventListener('input', (e) => { currentRotation = parseInt(e.target.value); draw(); });
     ratioSelect.addEventListener('change', draw);
     
+    // ★ 共通カラーピッカー変更時のイベント
+    globalColorInput.addEventListener('input', draw);
+    
     resetBtn.addEventListener('click', () => {
         currentScale = INITIAL_SCALE;
         currentRotation = INITIAL_ROTATE;
         scaleSlider.value = INITIAL_SCALE;
         rotateSlider.value = INITIAL_ROTATE;
+        
+        // ★ カラー値も初期色（青）へリセット
+        globalColorInput.value = INITIAL_COLOR;
+        
         draw();
     });
 
