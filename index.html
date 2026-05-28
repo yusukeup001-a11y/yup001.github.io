@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Composition Camera - Unified Color Edition</title>
+    <title>Composition Camera - iPhone Pro Style</title>
     <style>
-        body { margin: 0; background-color: #000; overflow: hidden; font-family: sans-serif; }
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         
         #videoContainer {
             position: absolute;
@@ -27,75 +27,136 @@
             pointer-events: none;
         }
 
+        /* 上部コントロールエリア */
         .top-controls {
             position: absolute;
-            top: 20px; width: 100%;
-            display: flex; justify-content: space-between;
-            padding: 0 15px; box-sizing: border-box;
+            top: 0; left: 0; width: 100%;
+            height: 70px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 20px; box-sizing: border-box;
             z-index: 10;
-            flex-wrap: wrap;
-            gap: 10px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%);
         }
 
-        .btn-ui {
-            background: rgba(0, 0, 0, 0.5);
-            color: white; border: 1px solid rgba(255,255,255,0.5);
-            padding: 8px 12px; border-radius: 8px; font-size: 13px;
-            cursor: pointer;
-            outline: none;
+        /* iPhone風丸型アイコンボタン */
+        .btn-icon {
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; outline: none; color: white;
+            transition: background 0.2s, transform 0.2s;
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+        }
+        .btn-icon:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.95);
+        }
+        .btn-icon svg {
+            width: 20px; height: 20px;
+            fill: currentColor;
         }
         
-        select.btn-ui {
-            padding-right: 25px;
+        /* 選択されている時にボタンをハイライト（黄色）するクラス（iPhone風） */
+        .btn-icon.active {
+            background: rgba(255, 204, 0, 0.25);
+            color: #ffcc00;
+        }
+        
+        /* モード選択のセレクトボックス */
+        select.btn-ui-select {
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff; border: 1px solid rgba(255,255,255,0.25);
+            padding: 6px 28px 6px 12px; border-radius: 20px; font-size: 13px;
+            cursor: pointer; outline: none;
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
             background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23fff' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 8px center;
-            background-size: 8px 10px;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
+            background-repeat: no-repeat; background-position: right 10px center; background-size: 8px 10px;
+            font-weight: 500;
         }
 
+        /* ★ 下部コントロール（常時表示はシャッターのみ） */
         .bottom-controls {
             position: absolute;
-            bottom: 30px; left: 50%;
+            bottom: 40px; left: 50%;
             transform: translateX(-50%);
-            z-index: 10; width: 85%;
-            display: flex; flex-direction: column; align-items: center; gap: 15px;
+            z-index: 10;
+            display: flex; flex-direction: column; align-items: center;
         }
 
+        /* ★ 格納・開閉される設定パネル（ドロワー）のスタイル */
         .slider-group {
-            width: 100%; background: rgba(0, 0, 0, 0.6);
-            padding: 15px; border-radius: 15px;
-            display: flex; flex-direction: column; gap: 10px; color: white;
+            position: absolute;
+            bottom: 100px; /* シャッターボタンの上に配置 */
+            width: calc(100vw - 40px);
+            max-width: 400px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px; border-radius: 24px;
+            display: flex; flex-direction: column; gap: 14px; color: white;
             box-sizing: border-box;
+            -webkit-backdrop-filter: blur(25px);
+            backdrop-filter: blur(25px);
+            border: 1px solid rgba(255,255,255,0.1);
+            
+            /* 開閉時のアニメーション設定 */
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+            pointer-events: none;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* パネルが開いている時の表示用クラス */
+        .slider-group.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
         }
 
         .slider-row {
-            display: flex; align-items: center; gap: 10px;
+            display: flex; align-items: center; gap: 12px;
         }
 
-        .slider-label { font-size: 11px; width: 35px; text-align: center; }
+        .slider-label { font-size: 12px; width: 35px; text-align: center; color: rgba(255,255,255,0.7); font-weight: 500; }
 
-        input[type=range] { flex-grow: 1; }
+        input[type=range] {
+            flex-grow: 1;
+            accent-color: #ffcc00; /* つまみの色をiPhoneのイエローに変更 */
+        }
 
-        /* ★ カラーピッカーエリアを共通1つにすっきり統合 */
+        .save-checkbox-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            display: flex; align-items: center; gap: 8px;
+            justify-content: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 12px;
+            margin-bottom: 4px;
+        }
+
         .color-picker-group {
             display: flex; justify-content: center; align-items: center; gap: 15px; width: 100%;
-            border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px; margin-top: 5px;
+            border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;
         }
         .color-item {
-            display: flex; align-items: center; gap: 8px;
+            display: flex; align-items: center; gap: 10px;
         }
-        .color-label { font-size: 11px; color: #ccc; }
+        .color-label { font-size: 12px; color: rgba(255,255,255,0.7); }
         input[type=color] {
-            border: none; background: none; width: 45px; height: 30px; cursor: pointer; padding: 0;
+            border: 1px solid rgba(255,255,255,0.2); background: none; width: 50px; height: 30px; cursor: pointer; padding: 0; border-radius: 6px;
         }
 
+        /* iPhoneシャッターボタン（二重円） */
         #captureBtn {
-            width: 70px; height: 70px; background: white;
-            border: 5px solid rgba(255, 255, 255, 0.3);
+            width: 76px; height: 76px; background: white;
+            border: 4px solid #000;
+            box-shadow: 0 0 0 4px white;
             border-radius: 50%; cursor: pointer;
+            transition: transform 0.1s;
+        }
+        #captureBtn:active {
+            transform: scale(0.9);
         }
     </style>
 </head>
@@ -107,25 +168,38 @@
 <canvas id="spiralCanvas"></canvas>
 
 <div class="top-controls">
-    <button id="flipBtn" class="btn-ui">カメラ切替</button>
+    <button id="flipBtn" class="btn-icon" title="カメラ切替">
+        <svg viewBox="0 0 24 24">
+            <path d="M9 12c0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3-3 1.34-3 3zm11-4h-3.17L15 6H9L7.17 8H4c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-9c0-1.1-.9-2-2-2zm-8 11c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm5.7-11H14.3l.6-1h2.2l.6 1z"/>
+            <path d="M19 8l-1.5-2.5h-5L11 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+    </button>
     
-    <select id="ratioSelect" class="btn-ui">
+    <select id="ratioSelect" class="btn-ui-select">
         <option value="golden-spiral">黄金スパイラル（渦巻き）</option>
         <option value="golden-rect">黄金長方形 (1:1.618)</option>
         <option value="silver-rect">白銀長方形 (1:1.414)</option>
     </select>
     
-    <button id="resetBtn" class="btn-ui">リセット</button>
-    <label class="btn-ui"><input type="checkbox" id="includeSpiral" checked> ガイド保存</label>
+    <button id="settingsToggleBtn" class="btn-icon" title="設定を開く">
+        <svg viewBox="0 0 24 24">
+            <path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
+        </svg>
+    </button>
 </div>
 
 <div class="bottom-controls">
-    <div class="slider-group">
+    <div id="settingsPanel" class="slider-group">
+        <label class="save-checkbox-label">
+            <input type="checkbox" id="includeSpiral" checked> ガイドも一緒に写真に保存する
+        </label>
+
         <div class="slider-row">
             <span class="slider-label">縮小</span>
             <input type="range" id="scaleSlider" min="0.1" max="2.0" step="0.01" value="0.8">
             <span class="slider-label">拡大</span>
         </div>
+        
         <div class="slider-row">
             <span class="slider-label">回転</span>
             <input type="range" id="rotateSlider" min="0" max="360" step="1" value="0">
@@ -137,8 +211,14 @@
                 <span class="color-label">ガイドの色設定</span>
                 <input type="color" id="globalColor" value="#00bbff">
             </div>
+            <button id="resetBtn" class="btn-icon" title="初期値に戻す" style="margin-left: auto;">
+                <svg viewBox="0 0 24 24">
+                    <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                </svg>
+            </button>
         </div>
     </div>
+    
     <button id="captureBtn"></button>
 </div>
 
@@ -153,20 +233,34 @@
     const resetBtn = document.getElementById('resetBtn');
     const ratioSelect = document.getElementById('ratioSelect');
     const includeSpiralCheck = document.getElementById('includeSpiral');
-    
-    // ★ 共通カラーピッカーの要素を取得
     const globalColorInput = document.getElementById('globalColor');
+    
+    // ★ 追加したUI操作用の要素
+    const settingsToggleBtn = document.getElementById('settingsToggleBtn');
+    const settingsPanel = document.getElementById('settingsPanel');
     
     const GOLDEN_RATIO = (1 + Math.sqrt(5)) / 2;
     const SILVER_RATIO = Math.sqrt(2);
     
     const INITIAL_SCALE = 0.8;
     const INITIAL_ROTATE = 0;
-    const INITIAL_COLOR = '#00bbff'; // 初期カラー値（青）
+    const INITIAL_COLOR = '#00bbff';
 
     let currentScale = INITIAL_SCALE;
     let currentRotation = INITIAL_ROTATE;
     let useFrontCamera = false;
+
+    // ★ 歯車ボタンがタップされたらパネルの開閉をトグル
+    settingsToggleBtn.addEventListener('click', () => {
+        const isVisible = settingsPanel.classList.toggle('show');
+        settingsToggleBtn.classList.toggle('active', isVisible);
+    });
+
+    // シャッターが押されたら誤動作防止のために設定パネルを閉じる
+    captureBtn.addEventListener('click', () => {
+        settingsPanel.classList.remove('show');
+        settingsToggleBtn.classList.remove('active');
+    });
 
     async function initCamera() {
         if (video.srcObject) {
@@ -198,8 +292,6 @@
         const currentMode = ratioSelect.value;
         const isSilver = currentMode === 'silver-rect';
         const ratio = isSilver ? SILVER_RATIO : GOLDEN_RATIO;
-        
-        // ★ モードに関係なく、共通のカラーピッカーから色を取得
         const color = globalColorInput.value;
 
         let rectW, rectH;
@@ -250,12 +342,12 @@
                         break;
                 }
 
-                ctx.strokeStyle = 'rgba(100, 255, 255, 0.2)';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
                 ctx.lineWidth = 1;
                 ctx.strokeRect(squareX, squareY, side, side);
 
                 ctx.beginPath();
-                ctx.strokeStyle = color; // 共通色をスパイラルに適用
+                ctx.strokeStyle = color;
                 ctx.lineWidth = 2.5;
                 ctx.arc(cx, cy, side, startAngle, endAngle, false);
                 ctx.stroke();
@@ -264,7 +356,7 @@
             }
         }
 
-        ctx.strokeStyle = color; // 共通色を外枠に適用
+        ctx.strokeStyle = color;
         ctx.lineWidth = 2.5;
         ctx.strokeRect(rx, ry, rectW, rectH);
 
@@ -275,8 +367,6 @@
     scaleSlider.addEventListener('input', (e) => { currentScale = parseFloat(e.target.value); draw(); });
     rotateSlider.addEventListener('input', (e) => { currentRotation = parseInt(e.target.value); draw(); });
     ratioSelect.addEventListener('change', draw);
-    
-    // ★ 共通カラーピッカー変更時のイベント
     globalColorInput.addEventListener('input', draw);
     
     resetBtn.addEventListener('click', () => {
@@ -284,10 +374,7 @@
         currentRotation = INITIAL_ROTATE;
         scaleSlider.value = INITIAL_SCALE;
         rotateSlider.value = INITIAL_ROTATE;
-        
-        // ★ カラー値も初期色（青）へリセット
         globalColorInput.value = INITIAL_COLOR;
-        
         draw();
     });
 
